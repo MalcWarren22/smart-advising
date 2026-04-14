@@ -1,0 +1,827 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Smart Advisor System API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication
+  - name: students
+    description: Student management
+  - name: courses
+    description: Course catalog
+  - name: progress
+    description: Degree progress tracking
+  - name: plans
+    description: Course planning
+  - name: advisor
+    description: Advisor operations
+  - name: dashboard
+    description: Dashboard summaries
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with username and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout current user
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user session
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /students:
+    get:
+      operationId: listStudents
+      tags: [students]
+      summary: List all students (advisor only)
+      responses:
+        "200":
+          description: List of students
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Student"
+
+  /students/{studentId}:
+    get:
+      operationId: getStudent
+      tags: [students]
+      summary: Get student details
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Student details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+
+  /courses:
+    get:
+      operationId: listCourses
+      tags: [courses]
+      summary: List all courses in the catalog
+      responses:
+        "200":
+          description: List of courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Course"
+
+  /progress/{studentId}:
+    get:
+      operationId: getProgress
+      tags: [progress]
+      summary: Get degree progress for a student
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Degree progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DegreeProgress"
+
+  /progress/{studentId}/courses/{courseId}:
+    put:
+      operationId: updateCourseStatus
+      tags: [progress]
+      summary: Update a student's course status
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCourseStatusBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentCourse"
+
+  /plans/{studentId}:
+    get:
+      operationId: getStudentPlan
+      tags: [plans]
+      summary: Get multi-semester course plan for a student
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Course plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoursePlan"
+    put:
+      operationId: updateStudentPlan
+      tags: [plans]
+      summary: Update multi-semester course plan
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePlanBody"
+      responses:
+        "200":
+          description: Updated plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoursePlan"
+
+  /recommendations/{studentId}:
+    get:
+      operationId: getRecommendations
+      tags: [plans]
+      summary: Get recommended courses for next semester
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Recommended courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CourseRecommendation"
+
+  /advisor/students/{studentId}/plan:
+    put:
+      operationId: advisorUpdateStudentPlan
+      tags: [advisor]
+      summary: Advisor modifies a student's course plan
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdvisorUpdatePlanBody"
+      responses:
+        "200":
+          description: Updated plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoursePlan"
+
+  /advisor/students/{studentId}/approve:
+    post:
+      operationId: approvePlan
+      tags: [advisor]
+      summary: Advisor approves a student's course plan
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdvisorNoteBody"
+      responses:
+        "200":
+          description: Plan approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /advisor/students/{studentId}/notes:
+    post:
+      operationId: addAdvisorNote
+      tags: [advisor]
+      summary: Add advisor note to student record
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdvisorNoteBody"
+      responses:
+        "200":
+          description: Note added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdvisorNote"
+
+  /dashboard/student/{studentId}:
+    get:
+      operationId: getStudentDashboard
+      tags: [dashboard]
+      summary: Get student dashboard summary
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentDashboard"
+
+  /dashboard/advisor:
+    get:
+      operationId: getAdvisorDashboard
+      tags: [dashboard]
+      summary: Get advisor dashboard summary
+      responses:
+        "200":
+          description: Advisor dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdvisorDashboard"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    LoginBody:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        role:
+          type: string
+          enum: [student, advisor]
+        studentId:
+          type: integer
+          nullable: true
+        name:
+          type: string
+      required:
+        - id
+        - username
+        - role
+        - name
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Student:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        username:
+          type: string
+        year:
+          type: integer
+        gpa:
+          type: number
+        creditsCompleted:
+          type: integer
+        creditsTotal:
+          type: integer
+        advisorId:
+          type: integer
+          nullable: true
+        planApproved:
+          type: boolean
+        planApprovedAt:
+          type: string
+          nullable: true
+      required:
+        - id
+        - name
+        - username
+        - year
+        - gpa
+        - creditsCompleted
+        - creditsTotal
+        - planApproved
+
+    Course:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        name:
+          type: string
+        credits:
+          type: integer
+        year:
+          type: integer
+        category:
+          type: string
+          enum: [core, elective, general_ed, other]
+        semesterOffered:
+          type: string
+          enum: [fall, spring, both]
+        prerequisites:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+          nullable: true
+      required:
+        - id
+        - code
+        - name
+        - credits
+        - year
+        - category
+        - semesterOffered
+        - prerequisites
+
+    StudentCourse:
+      type: object
+      properties:
+        studentId:
+          type: integer
+        courseId:
+          type: integer
+        status:
+          type: string
+          enum: [completed, in_progress, not_started]
+        grade:
+          type: string
+          nullable: true
+      required:
+        - studentId
+        - courseId
+        - status
+
+    UpdateCourseStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [completed, in_progress, not_started]
+        grade:
+          type: string
+          nullable: true
+      required:
+        - status
+
+    DegreeProgress:
+      type: object
+      properties:
+        studentId:
+          type: integer
+        totalCredits:
+          type: integer
+        completedCredits:
+          type: integer
+        inProgressCredits:
+          type: integer
+        remainingCredits:
+          type: integer
+        percentComplete:
+          type: number
+        courses:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseWithStatus"
+      required:
+        - studentId
+        - totalCredits
+        - completedCredits
+        - inProgressCredits
+        - remainingCredits
+        - percentComplete
+        - courses
+
+    CourseWithStatus:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        name:
+          type: string
+        credits:
+          type: integer
+        year:
+          type: integer
+        category:
+          type: string
+        semesterOffered:
+          type: string
+        prerequisites:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [completed, in_progress, not_started]
+        grade:
+          type: string
+          nullable: true
+        prerequisitesMet:
+          type: boolean
+      required:
+        - id
+        - code
+        - name
+        - credits
+        - year
+        - category
+        - semesterOffered
+        - prerequisites
+        - status
+        - prerequisitesMet
+
+    CoursePlan:
+      type: object
+      properties:
+        studentId:
+          type: integer
+        approved:
+          type: boolean
+        approvedAt:
+          type: string
+          nullable: true
+        approvedBy:
+          type: string
+          nullable: true
+        semesters:
+          type: array
+          items:
+            $ref: "#/components/schemas/SemesterPlan"
+        advisorNotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdvisorNote"
+      required:
+        - studentId
+        - approved
+        - semesters
+        - advisorNotes
+
+    SemesterPlan:
+      type: object
+      properties:
+        semester:
+          type: string
+        year:
+          type: integer
+        courses:
+          type: array
+          items:
+            type: integer
+        totalCredits:
+          type: integer
+      required:
+        - semester
+        - year
+        - courses
+        - totalCredits
+
+    UpdatePlanBody:
+      type: object
+      properties:
+        semesters:
+          type: array
+          items:
+            $ref: "#/components/schemas/SemesterPlan"
+      required:
+        - semesters
+
+    AdvisorUpdatePlanBody:
+      type: object
+      properties:
+        semesters:
+          type: array
+          items:
+            $ref: "#/components/schemas/SemesterPlan"
+        note:
+          type: string
+          nullable: true
+      required:
+        - semesters
+
+    CourseRecommendation:
+      type: object
+      properties:
+        course:
+          $ref: "#/components/schemas/Course"
+        reason:
+          type: string
+        priority:
+          type: string
+          enum: [high, medium, low]
+      required:
+        - course
+        - reason
+        - priority
+
+    AdvisorNoteBody:
+      type: object
+      properties:
+        note:
+          type: string
+      required:
+        - note
+
+    AdvisorNote:
+      type: object
+      properties:
+        id:
+          type: integer
+        advisorName:
+          type: string
+        note:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - advisorName
+        - note
+        - createdAt
+
+    StudentDashboard:
+      type: object
+      properties:
+        student:
+          $ref: "#/components/schemas/Student"
+        percentComplete:
+          type: number
+        completedCredits:
+          type: integer
+        remainingCredits:
+          type: integer
+        currentSemesterCourses:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseWithStatus"
+        upcomingDeadlines:
+          type: array
+          items:
+            $ref: "#/components/schemas/Deadline"
+        gpaHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/GpaPoint"
+      required:
+        - student
+        - percentComplete
+        - completedCredits
+        - remainingCredits
+        - currentSemesterCourses
+        - upcomingDeadlines
+        - gpaHistory
+
+    Deadline:
+      type: object
+      properties:
+        title:
+          type: string
+        date:
+          type: string
+        type:
+          type: string
+          enum: [registration, advising, exam, other]
+      required:
+        - title
+        - date
+        - type
+
+    GpaPoint:
+      type: object
+      properties:
+        semester:
+          type: string
+        gpa:
+          type: number
+      required:
+        - semester
+        - gpa
+
+    AdvisorDashboard:
+      type: object
+      properties:
+        totalStudents:
+          type: integer
+        studentsOnTrack:
+          type: integer
+        studentsAtRisk:
+          type: integer
+        pendingApprovals:
+          type: integer
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityItem"
+        studentProgress:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudentProgressSummary"
+      required:
+        - totalStudents
+        - studentsOnTrack
+        - studentsAtRisk
+        - pendingApprovals
+        - recentActivity
+        - studentProgress
+
+    ActivityItem:
+      type: object
+      properties:
+        studentName:
+          type: string
+        action:
+          type: string
+        timestamp:
+          type: string
+      required:
+        - studentName
+        - action
+        - timestamp
+
+    StudentProgressSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        year:
+          type: integer
+        percentComplete:
+          type: number
+        gpa:
+          type: number
+        planApproved:
+          type: boolean
+        atRisk:
+          type: boolean
+      required:
+        - id
+        - name
+        - year
+        - percentComplete
+        - gpa
+        - planApproved
+        - atRisk

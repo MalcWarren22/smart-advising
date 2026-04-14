@@ -1,0 +1,58 @@
+# ── Node / JS ──────────────────────────────────────────────
+node_modules/
+dist/
+tmp/
+out-tsc/
+*.tsbuildinfo
+.expo
+.expo-shared
+
+# ── Python ─────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.pyc
+.venv/
+venv/
+env/
+.pythonlibs/
+
+# ── Environment / secrets ──────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Replit-specific (not needed in GitHub) ─────────────────
+.cache/
+.local/
+.agents/
+replit.md
+.replit
+.replitignore
+.replit-artifact/
+artifacts/
+attached_assets/
+scripts/
+
+# ── IDEs ───────────────────────────────────────────────────
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+# ── OS ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Misc ───────────────────────────────────────────────────
+npm-debug.log
+yarn-error.log
+*.log
+/coverage

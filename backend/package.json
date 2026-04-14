@@ -1,0 +1,6 @@
+{
+  "name": "@workspace/api-server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Python FastAPI backend — see requirements.txt and main.py"
+}
