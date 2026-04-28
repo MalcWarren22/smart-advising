@@ -145,6 +145,67 @@ paths:
                 items:
                   $ref: "#/components/schemas/Course"
 
+  /students/{studentId}/curriculum:
+    put:
+      operationId: updateStudentCurriculum
+      tags: [students]
+      summary: Update a student's curriculum (advisor only)
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCurriculumBody"
+      responses:
+        "200":
+          description: Updated student
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+
+  /curricula:
+    get:
+      operationId: listCurricula
+      tags: [courses]
+      summary: List all available curricula
+      responses:
+        "200":
+          description: List of curricula
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Curriculum"
+
+  /curricula/{curriculumId}/courses:
+    get:
+      operationId: listCurriculumCourses
+      tags: [courses]
+      summary: List courses for a specific curriculum
+      parameters:
+        - name: curriculumId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Courses in curriculum
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Course"
+
   /progress/{studentId}:
     get:
       operationId: getProgress
@@ -366,6 +427,23 @@ paths:
 
 components:
   schemas:
+    Curriculum:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        name:
+          type: string
+        totalCredits:
+          type: integer
+      required:
+        - id
+        - code
+        - name
+        - totalCredits
+
     HealthStatus:
       type: object
       properties:
@@ -447,6 +525,12 @@ components:
         planApprovedAt:
           type: string
           nullable: true
+        curriculumId:
+          type: integer
+          nullable: true
+        curriculumName:
+          type: string
+          nullable: true
       required:
         - id
         - name
@@ -522,6 +606,14 @@ components:
           nullable: true
       required:
         - status
+
+    UpdateCurriculumBody:
+      type: object
+      properties:
+        curriculumId:
+          type: integer
+      required:
+        - curriculumId
 
     DegreeProgress:
       type: object

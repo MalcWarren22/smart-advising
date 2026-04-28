@@ -9,11 +9,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from starlette.middleware.sessions import SessionMiddleware
-from fastapi import FastAPI
 from database import engine
 from models import Base
+from sqlalchemy import text
 
 Base.metadata.create_all(bind=engine)
+
+# Run column migrations for new fields that may not exist on older installs
+def run_migrations():
+    with engine.connect() as conn:
+        conn.execute(text("""
+            ALTER TABLE students
+            ADD COLUMN IF NOT EXISTS curriculum_id INTEGER
+        """))
+        conn.commit()
+
+run_migrations()
 
 app = FastAPI()
 

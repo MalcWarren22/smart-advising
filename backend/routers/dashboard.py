@@ -4,6 +4,7 @@ from datetime import datetime, timezone, timedelta
 from database import get_db
 import models
 from deps import get_current_user, require_advisor, require_student_access
+from routers.progress import get_curriculum_courses
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -14,20 +15,21 @@ def get_student_dashboard(student_id: int, request: Request, db: Session = Depen
     student = require_student_access(current_user, student_id, db)
 
     user = db.query(models.User).filter(models.User.id == student.user_id).first()
-    all_courses = db.query(models.Course).all()
+
+    curriculum_courses = get_curriculum_courses(student, db)
     student_courses = db.query(models.StudentCourse).filter(
         models.StudentCourse.student_id == student_id
     ).all()
 
     status_map = {sc.course_id: sc for sc in student_courses}
     completed_codes = {
-        c.code for c in all_courses
+        c.code for c, _ in curriculum_courses
         if status_map.get(c.id) and status_map[c.id].status == "completed"
     }
 
-    total_credits = sum(c.credits for c in all_courses)
+    total_credits = sum(c.credits for c, _ in curriculum_courses)
     completed_credits = sum(
-        c.credits for c in all_courses
+        c.credits for c, _ in curriculum_courses
         if status_map.get(c.id) and status_map[c.id].status == "completed"
     )
     percent_complete = round((completed_credits / total_credits) * 100, 1) if total_credits > 0 else 0
@@ -39,7 +41,7 @@ def get_student_dashboard(student_id: int, request: Request, db: Session = Depen
             "code": c.code,
             "name": c.name,
             "credits": c.credits,
-            "year": c.year,
+            "year": year,
             "category": c.category,
             "semesterOffered": c.semester_offered,
             "prerequisites": c.prerequisites or [],
@@ -47,9 +49,15 @@ def get_student_dashboard(student_id: int, request: Request, db: Session = Depen
             "grade": None,
             "prerequisitesMet": all(p in completed_codes for p in (c.prerequisites or [])),
         }
-        for c in all_courses
+        for c, year in curriculum_courses
         if status_map.get(c.id) and status_map[c.id].status == "in_progress"
     ]
+
+    curriculum_name = None
+    if student.curriculum_id:
+        curriculum = db.query(models.Curriculum).filter(models.Curriculum.id == student.curriculum_id).first()
+        if curriculum:
+            curriculum_name = curriculum.name
 
     upcoming_deadlines = [
         {"title": "Registration Deadline — Fall 2026", "date": "2026-04-15", "type": "registration"},
@@ -77,6 +85,8 @@ def get_student_dashboard(student_id: int, request: Request, db: Session = Depen
             "planApproved": student.plan_approved,
             "planApprovedAt": student.plan_approved_at.isoformat() if student.plan_approved_at else None,
             "advisorId": student.advisor_id,
+            "curriculumId": student.curriculum_id,
+            "curriculumName": curriculum_name,
         },
         "percentComplete": percent_complete,
         "completedCredits": completed_credits,
@@ -92,18 +102,36 @@ def get_advisor_dashboard(request: Request, db: Session = Depends(get_db)):
     current_user = get_current_user(request, db)
     require_advisor(current_user)
 
-    # Only students assigned to this advisor
     assigned_rows = db.query(models.Student, models.User).join(
         models.User, models.Student.user_id == models.User.id
     ).filter(models.Student.advisor_id == current_user.id).all()
 
-    all_courses = db.query(models.Course).all()
-    total_credits = sum(c.credits for c in all_courses)
-
     student_progress = []
     for student, user in assigned_rows:
-        percent = round((student.credits_completed / total_credits) * 100, 1) if total_credits > 0 else 0
+        curriculum_courses = get_curriculum_courses(student, db)
+        total_credits = sum(c.credits for c, _ in curriculum_courses)
+
+        student_courses_completed = db.query(models.StudentCourse).filter(
+            models.StudentCourse.student_id == student.id,
+            models.StudentCourse.status == "completed",
+        ).all()
+        course_id_to_credits = {c.id: c.credits for c, _ in curriculum_courses}
+        completed_credits = sum(
+            course_id_to_credits.get(sc.course_id, 0)
+            for sc in student_courses_completed
+        )
+
+        percent = round((completed_credits / total_credits) * 100, 1) if total_credits > 0 else 0
         at_risk = student.gpa < 2.0 or percent < 20
+
+        curriculum_name = None
+        if student.curriculum_id:
+            curriculum = db.query(models.Curriculum).filter(
+                models.Curriculum.id == student.curriculum_id
+            ).first()
+            if curriculum:
+                curriculum_name = curriculum.name
+
         student_progress.append({
             "id": student.id,
             "name": user.name,
@@ -112,6 +140,7 @@ def get_advisor_dashboard(request: Request, db: Session = Depends(get_db)):
             "gpa": student.gpa,
             "planApproved": student.plan_approved,
             "atRisk": at_risk,
+            "curriculumName": curriculum_name,
         })
 
     students_on_track = sum(1 for s in student_progress if not s["atRisk"])

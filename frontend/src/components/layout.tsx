@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useGetMe, useLogout, getGetMeQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -36,14 +37,17 @@ export default function Layout({ children }: LayoutProps) {
     }
   });
 
+  useEffect(() => {
+    if (!isLoading && !user && location !== "/") {
+      setLocation("/");
+    }
+  }, [isLoading, user, location, setLocation]);
+
   if (isLoading) {
     return <div className="min-h-screen bg-background flex items-center justify-center">Loading...</div>;
   }
 
   if (!user) {
-    if (location !== "/") {
-      setLocation("/");
-    }
     return <>{children}</>;
   }
 

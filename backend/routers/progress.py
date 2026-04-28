@@ -45,24 +45,49 @@ class StudentCourseResponse(BaseModel):
     grade: Optional[str] = None
 
 
+def get_curriculum_courses(student: models.Student, db: Session):
+    """Return courses for the student's curriculum with curriculum-specific year ordering."""
+    if student.curriculum_id:
+        rows = db.query(models.Course, models.CurriculumCourse).join(
+            models.CurriculumCourse,
+            models.Course.id == models.CurriculumCourse.course_id,
+        ).filter(
+            models.CurriculumCourse.curriculum_id == student.curriculum_id
+        ).order_by(models.CurriculumCourse.year, models.Course.id).all()
+
+        # Deduplicate (a course may appear in multiple years for elective flexibility)
+        seen = set()
+        result = []
+        for c, cc in rows:
+            if c.id not in seen:
+                seen.add(c.id)
+                result.append((c, cc.year))
+        return result
+    else:
+        # Fallback: all courses with their default year
+        courses = db.query(models.Course).order_by(models.Course.year, models.Course.id).all()
+        return [(c, c.year) for c in courses]
+
+
 @router.get("/{student_id}", response_model=DegreeProgress)
 def get_progress(student_id: int, request: Request, db: Session = Depends(get_db)):
     current_user = get_current_user(request, db)
-    require_student_access(current_user, student_id, db)
+    student = require_student_access(current_user, student_id, db)
 
-    all_courses = db.query(models.Course).order_by(models.Course.year, models.Course.id).all()
+    curriculum_courses = get_curriculum_courses(student, db)
+
     student_courses = db.query(models.StudentCourse).filter(
         models.StudentCourse.student_id == student_id
     ).all()
 
     status_map = {sc.course_id: sc for sc in student_courses}
     completed_codes = {
-        c.code for c in all_courses
+        c.code for c, _ in curriculum_courses
         if status_map.get(c.id) and status_map[c.id].status == "completed"
     }
 
     courses = []
-    for c in all_courses:
+    for c, year in curriculum_courses:
         sc = status_map.get(c.id)
         status = sc.status if sc else "not_started"
         prereqs_met = all(p in completed_codes for p in (c.prerequisites or []))
@@ -71,7 +96,7 @@ def get_progress(student_id: int, request: Request, db: Session = Depends(get_db
             code=c.code,
             name=c.name,
             credits=c.credits,
-            year=c.year,
+            year=year,
             category=c.category,
             semesterOffered=c.semester_offered,
             prerequisites=c.prerequisites or [],
@@ -80,9 +105,15 @@ def get_progress(student_id: int, request: Request, db: Session = Depends(get_db
             prerequisitesMet=prereqs_met,
         ))
 
-    total = sum(c.credits for c in all_courses)
-    completed = sum(c.credits for c in all_courses if status_map.get(c.id) and status_map[c.id].status == "completed")
-    in_progress = sum(c.credits for c in all_courses if status_map.get(c.id) and status_map[c.id].status == "in_progress")
+    total = sum(c.credits for c, _ in curriculum_courses)
+    completed = sum(
+        c.credits for c, _ in curriculum_courses
+        if status_map.get(c.id) and status_map[c.id].status == "completed"
+    )
+    in_progress = sum(
+        c.credits for c, _ in curriculum_courses
+        if status_map.get(c.id) and status_map[c.id].status == "in_progress"
+    )
     remaining = total - completed - in_progress
 
     return DegreeProgress(
@@ -106,7 +137,6 @@ def update_course_status(
 ):
     current_user = get_current_user(request, db)
 
-    # Only the student themselves may update their own course statuses
     if current_user.role != "student":
         raise HTTPException(status_code=403, detail="Only students can update their own course status")
 
@@ -140,14 +170,20 @@ def update_course_status(
         db.refresh(new_sc)
         result = new_sc
 
-    all_courses = db.query(models.Course).all()
-    student_courses = db.query(models.StudentCourse).filter(
+    # Recalculate credits_completed from this student's curriculum
+    curriculum_courses = get_curriculum_courses(student, db)
+    curriculum_course_ids = {c.id for c, _ in curriculum_courses}
+
+    student_courses_completed = db.query(models.StudentCourse).filter(
         models.StudentCourse.student_id == student_id,
         models.StudentCourse.status == "completed",
     ).all()
+
+    all_courses_map = {c.id: c for c, _ in curriculum_courses}
     completed_credits = sum(
-        c.credits for c in all_courses
-        if any(sc.course_id == c.id for sc in student_courses)
+        all_courses_map[sc.course_id].credits
+        for sc in student_courses_completed
+        if sc.course_id in all_courses_map
     )
     db.query(models.Student).filter(models.Student.id == student_id).update(
         {"credits_completed": completed_credits}

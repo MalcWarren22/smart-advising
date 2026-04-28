@@ -3,6 +3,26 @@ from sqlalchemy.sql import func
 from database import Base
 
 
+class Curriculum(Base):
+    __tablename__ = "curricula"
+
+    id = Column(Integer, primary_key=True)
+    code = Column(String, nullable=False, unique=True)
+    name = Column(String, nullable=False)
+    total_credits = Column(Integer, nullable=False, default=120)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class CurriculumCourse(Base):
+    __tablename__ = "curriculum_courses"
+
+    curriculum_id = Column(Integer, nullable=False)
+    course_id = Column(Integer, nullable=False)
+    year = Column(Integer, nullable=False)
+
+    __table_args__ = (PrimaryKeyConstraint("curriculum_id", "course_id"),)
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -20,6 +40,7 @@ class Student(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, nullable=False)
     advisor_id = Column(Integer, nullable=True)
+    curriculum_id = Column(Integer, nullable=True)
     year = Column(Integer, nullable=False, default=1)
     gpa = Column(Float, nullable=False, default=0.0)
     credits_completed = Column(Integer, nullable=False, default=0)

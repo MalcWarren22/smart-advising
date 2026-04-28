@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from database import get_db
 import models
 from deps import get_current_user, require_advisor, require_student_access
+from routers.progress import get_curriculum_courses
 
 router = APIRouter(tags=["plans"])
 
@@ -149,19 +150,19 @@ def update_student_plan(
 @router.get("/recommendations/{student_id}", response_model=list[CourseRecommendation])
 def get_recommendations(student_id: int, request: Request, db: Session = Depends(get_db)):
     current_user = get_current_user(request, db)
-    require_student_access(current_user, student_id, db)
+    student = require_student_access(current_user, student_id, db)
 
-    all_courses = db.query(models.Course).order_by(models.Course.year, models.Course.id).all()
+    curriculum_courses = get_curriculum_courses(student, db)
     student_courses = db.query(models.StudentCourse).filter(
         models.StudentCourse.student_id == student_id
     ).all()
 
     completed_ids = {sc.course_id for sc in student_courses if sc.status == "completed"}
     in_progress_ids = {sc.course_id for sc in student_courses if sc.status == "in_progress"}
-    completed_codes = {c.code for c in all_courses if c.id in completed_ids}
+    completed_codes = {c.code for c, _ in curriculum_courses if c.id in completed_ids}
 
     recommendations = []
-    for course in all_courses:
+    for course, year in curriculum_courses:
         if course.id in completed_ids or course.id in in_progress_ids:
             continue
         prereqs = course.prerequisites or []
@@ -173,7 +174,7 @@ def get_recommendations(student_id: int, request: Request, db: Session = Depends
             reason = "Required core course — all prerequisites met"
         elif course.category == "elective":
             priority = "medium"
-            reason = "Major elective — counts toward your 15 required elective credits"
+            reason = "Major elective — counts toward your required elective credits"
         else:
             priority = "low"
             reason = "General education or graduation requirement"
@@ -184,7 +185,7 @@ def get_recommendations(student_id: int, request: Request, db: Session = Depends
                 "code": course.code,
                 "name": course.name,
                 "credits": course.credits,
-                "year": course.year,
+                "year": year,
                 "category": course.category,
                 "semesterOffered": course.semester_offered,
                 "prerequisites": course.prerequisites or [],

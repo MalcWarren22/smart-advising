@@ -1,8 +1,8 @@
-import { useGetProgress, getGetProgressQueryKey, useUpdateCourseStatus, useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useGetProgress, getGetProgressQueryKey, useUpdateCourseStatus, useGetMe, getGetMeQueryKey, useGetStudent, getGetStudentQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, Clock, CircleDashed, Filter, Search, Lock } from "lucide-react";
+import { CheckCircle2, Clock, CircleDashed, Filter, Search, Lock, GraduationCap } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
@@ -24,6 +24,13 @@ export default function StudentProgress() {
     query: { 
       enabled: !!studentId,
       queryKey: getGetProgressQueryKey(studentId)
+    }
+  });
+
+  const { data: studentInfo } = useGetStudent(studentId, {
+    query: {
+      enabled: !!studentId,
+      queryKey: getGetStudentQueryKey(studentId),
     }
   });
 
@@ -105,9 +112,17 @@ export default function StudentProgress() {
     <div className="space-y-8 pb-10">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-gray-900">Degree Progress</h1>
-        <p className="text-muted-foreground mt-1">
-          Track your curriculum requirements and update course statuses.
-        </p>
+        <div className="flex items-center gap-3 mt-1">
+          <p className="text-muted-foreground">
+            Track your curriculum requirements and update course statuses.
+          </p>
+          {studentInfo?.curriculumName && (
+            <Badge variant="outline" className="bg-[#006747]/10 text-[#006747] border-[#006747]/30 gap-1.5 shrink-0">
+              <GraduationCap className="w-3 h-3" />
+              {studentInfo.curriculumName}
+            </Badge>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-white p-4 rounded-lg border border-gray-200 shadow-sm">

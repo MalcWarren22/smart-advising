@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, AlertTriangle, CheckCircle2, MoreHorizontal } from "lucide-react";
+import { Search, Filter, AlertTriangle, CheckCircle2, GraduationCap } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 
@@ -79,6 +79,12 @@ export default function AdvisorStudents() {
                     <TableCell>
                       <div className="font-semibold text-gray-900">{student.name}</div>
                       <div className="text-xs text-muted-foreground font-mono mt-0.5">{student.username}</div>
+                      {student.curriculumName && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <GraduationCap className="w-3 h-3 text-[#006747]" />
+                          <span className="text-xs text-[#006747] font-medium">{student.curriculumName}</span>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="bg-gray-50 text-gray-700 uppercase tracking-wider text-[10px]">

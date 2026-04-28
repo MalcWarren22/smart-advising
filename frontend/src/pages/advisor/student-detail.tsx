@@ -4,7 +4,9 @@ import {
   useGetProgress, getGetProgressQueryKey,
   useGetStudentPlan, getGetStudentPlanQueryKey,
   useApprovePlan, useAddAdvisorNote, useAdvisorUpdateStudentPlan,
-  useListCourses, getListCoursesQueryKey,
+  useListCurriculumCourses, getListCurriculumCoursesQueryKey,
+  useListCurricula, getListCurriculaQueryKey,
+  useUpdateStudentCurriculum,
   Course
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -16,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertTriangle, MessageSquare, Target, Clock, Pencil, Save, X, Plus, Trash2, Info } from "lucide-react";
+import { CheckCircle2, AlertTriangle, MessageSquare, Target, Clock, Pencil, Save, X, Plus, Trash2, Info, BookOpen } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +34,8 @@ export default function StudentDetail() {
   const [editNote, setEditNote] = useState("");
   const [courseToAdd, setCourseToAdd] = useState<string>("");
   const [dialogOpen, setDialogOpen] = useState<number | null>(null);
+  const [curriculumDialogOpen, setCurriculumDialogOpen] = useState(false);
+  const [pendingCurriculumId, setPendingCurriculumId] = useState<string>("");
 
   const { data: student, isLoading: isStudentLoading } = useGetStudent(studentId, {
     query: { enabled: !!studentId, queryKey: getGetStudentQueryKey(studentId) }
@@ -45,11 +49,19 @@ export default function StudentDetail() {
     query: { enabled: !!studentId, queryKey: getGetStudentPlanQueryKey(studentId) }
   });
 
-  const { data: allCourses } = useListCourses({
-    query: { queryKey: getListCoursesQueryKey() }
+  const { data: curricula } = useListCurricula({
+    query: { queryKey: getListCurriculaQueryKey() }
   });
 
-  // Sync local semesters from plan data when not editing
+  const curriculumId = student?.curriculumId ?? 1;
+
+  const { data: curriculumCourses } = useListCurriculumCourses(curriculumId, {
+    query: { 
+      enabled: !!student,
+      queryKey: getListCurriculumCoursesQueryKey(curriculumId)
+    }
+  });
+
   useEffect(() => {
     if (plan && !isEditingPlan) {
       setLocalSemesters(plan.semesters as any[]);
@@ -91,11 +103,27 @@ export default function StudentDetail() {
     }
   });
 
-  if (isStudentLoading || isProgressLoading || isPlanLoading || !student || !progress || !plan || !allCourses) {
+  const updateCurriculum = useUpdateStudentCurriculum({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetStudentQueryKey(studentId) });
+        queryClient.invalidateQueries({ queryKey: getGetProgressQueryKey(studentId) });
+        queryClient.invalidateQueries({ queryKey: getGetStudentPlanQueryKey(studentId) });
+        setCurriculumDialogOpen(false);
+        setPendingCurriculumId("");
+        toast({ title: "Curriculum Updated", description: "The student's curriculum has been changed." });
+      },
+      onError: () => {
+        toast({ variant: "destructive", title: "Error", description: "Failed to update curriculum." });
+      }
+    }
+  });
+
+  if (isStudentLoading || isProgressLoading || isPlanLoading || !student || !progress || !plan) {
     return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
   }
 
-  const coursesById = allCourses.reduce((acc, course) => {
+  const coursesById = (curriculumCourses ?? []).reduce((acc, course) => {
     acc[course.id] = course;
     return acc;
   }, {} as Record<number, Course>);
@@ -159,13 +187,22 @@ export default function StudentDetail() {
     setDialogOpen(null);
   };
 
+  const handleChangeCurriculum = () => {
+    if (!pendingCurriculumId) return;
+    updateCurriculum.mutate({ studentId, data: { curriculumId: parseInt(pendingCurriculumId, 10) } });
+  };
+
   const getAvailableCourses = () => {
     const plannedIds = new Set<number>();
     localSemesters.forEach(s => s.courses.forEach((c: number) => plannedIds.add(c)));
-    return allCourses.filter(c => !plannedIds.has(c.id));
+    return (curriculumCourses ?? []).filter(c => !plannedIds.has(c.id));
   };
 
   const displaySemesters = isEditingPlan ? localSemesters : (plan.semesters as any[]);
+
+  const curriculumColor = student.curriculumName?.toLowerCase().includes("cyber")
+    ? "bg-indigo-100 text-indigo-800"
+    : "bg-emerald-100 text-emerald-800";
 
   return (
     <div className="space-y-8 pb-10">
@@ -181,6 +218,51 @@ export default function StudentDetail() {
               <span className="font-mono">{student.username}</span>
               <span>•</span>
               <span className="uppercase font-bold tracking-wider">Year {student.year}</span>
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <Badge className={`${curriculumColor} hover:${curriculumColor} border-none text-xs`}>
+                <BookOpen className="w-3 h-3 mr-1" />
+                {student.curriculumName ?? "CS General"}
+              </Badge>
+              <Dialog open={curriculumDialogOpen} onOpenChange={setCurriculumDialogOpen}>
+                <DialogTrigger asChild>
+                  <button className="text-xs text-muted-foreground underline underline-offset-2 hover:text-gray-800 transition-colors">
+                    Change
+                  </button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Change Curriculum</DialogTitle>
+                    <DialogDescription>
+                      Reassign <strong>{student.name}</strong> to a different program. This will update their degree audit and credit total.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4 space-y-4">
+                    <Select
+                      value={pendingCurriculumId}
+                      onValueChange={setPendingCurriculumId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a program..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(curricula ?? []).map(c => (
+                          <SelectItem key={c.id} value={c.id.toString()}>
+                            {c.name} ({c.totalCredits} cr)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      className="w-full bg-[#006747] hover:bg-[#005238] text-white"
+                      onClick={handleChangeCurriculum}
+                      disabled={!pendingCurriculumId || updateCurriculum.isPending}
+                    >
+                      {updateCurriculum.isPending ? "Saving..." : "Confirm Change"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>
@@ -327,7 +409,7 @@ export default function StudentDetail() {
                             <DialogHeader>
                               <DialogTitle>Add Course</DialogTitle>
                               <DialogDescription>
-                                Select a course to add to {semester.semester} {semester.year}.
+                                Select a course from the student's curriculum to add to {semester.semester} {semester.year}.
                               </DialogDescription>
                             </DialogHeader>
                             <div className="py-4 space-y-4">
@@ -424,7 +506,7 @@ export default function StudentDetail() {
             <CardHeader className="bg-gray-50/50 border-b border-gray-100 py-4">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Target className="w-5 h-5 text-[#006747]" />
-                Curriculum Audit
+                Curriculum Audit — {student.curriculumName ?? "CS General"}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
